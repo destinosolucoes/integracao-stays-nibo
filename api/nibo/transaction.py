@@ -80,6 +80,15 @@ def send_transaction(reservation_dto, type: str):
 
     return create_credit_schedule(transaction_dto)
 
+def check_transaction_created(reservation_dto):
+    debit_schedules = get_debit_schedule(reservation_dto["reservation_id"])
+    credit_schedules = get_credit_schedule(reservation_dto["reservation_id"])
+
+    if len(debit_schedules) > 0 or len(credit_schedules) > 0:
+        return True
+    
+    return False
+
 def update_transaction(reservation_report, reservation_dto):
     debit_schedules = get_debit_schedule(reservation_dto["reservation_id"])
     credit_schedules = get_credit_schedule(reservation_dto["reservation_id"])

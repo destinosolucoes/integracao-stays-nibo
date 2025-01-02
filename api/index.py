@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .stays.index import get_reservation_report
 from .nibo.utils import check_special_booking
-from .nibo.transaction import send_transaction, update_transaction, delete_transaction
+from .nibo.transaction import send_transaction, update_transaction, delete_transaction, check_transaction_created
 from .utils import create_reservation_dto, calculate_expedia, create_log, validate_header
 
 app = FastAPI(docs_url="/api/docs", openapi_url="/api/openapi.json")
@@ -46,21 +46,22 @@ async def webhook_reservation(request: Request):
             reservation_dto = create_reservation_dto(reservation_report, reservation)
             reservation_dto = calculate_expedia(reservation_dto)
 
-            receivable_transaction = send_transaction(reservation_dto, "receivable")
-            if receivable_transaction is False:
-                print("Erro ao criar receivable_transaction")
-                print(receivable_transaction)
+            if not check_transaction_created(reservation_dto):
+                receivable_transaction = send_transaction(reservation_dto, "receivable")
+                if receivable_transaction is False:
+                    print("Erro ao criar receivable_transaction")
+                    print(receivable_transaction)
 
-            operational_transaction = send_transaction(reservation_dto, "operational")
-            if operational_transaction is False:
-                print("Erro ao criar operational_transaction")
-                print(operational_transaction)
-            
-            if reservation_dto["partner_name"] == "API booking.com" and check_special_booking(reservation_dto["partner_name"]):
-                comission_transaction = send_transaction(reservation_dto, "comission")
-                if comission_transaction is False:
-                    print("Erro ao criar comission_transaction")
-                    print(comission_transaction)
+                operational_transaction = send_transaction(reservation_dto, "operational")
+                if operational_transaction is False:
+                    print("Erro ao criar operational_transaction")
+                    print(operational_transaction)
+                
+                if reservation_dto["partner_name"] == "API booking.com" and check_special_booking(reservation_dto["partner_name"]):
+                    comission_transaction = send_transaction(reservation_dto, "comission")
+                    if comission_transaction is False:
+                        print("Erro ao criar comission_transaction")
+                        print(comission_transaction)
         
     if data["action"] == "reservation.modified":
         reservation = data["payload"]
