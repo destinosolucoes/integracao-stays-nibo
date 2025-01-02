@@ -1,7 +1,4 @@
 {
-    "build": {
-      "use": "@vercel/python"
-    },
     "routes": [
       {
         "src": "/(.*)",
