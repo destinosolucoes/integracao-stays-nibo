@@ -6,7 +6,7 @@ from .nibo.utils import check_special_booking
 from .nibo.transaction import send_transaction, update_transaction, delete_transaction
 from .utils import create_reservation_dto, calculate_expedia, create_log, validate_header
 
-app = FastAPI(docs_url="/api/py/docs", openapi_url="/api/py/openapi.json")
+app = FastAPI(docs_url="/api/docs", openapi_url="/api/openapi.json")
 
 origins = [
     "*",
@@ -19,6 +19,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/api/health")
+def health():
+    return { "status": "ready" }
 
 @app.post("/api/stays-webhook")
 async def webhook_reservation(request: Request):
