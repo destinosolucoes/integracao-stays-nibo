@@ -1,0 +1,41 @@
+from os import getenv
+from dotenv import load_dotenv
+
+load_dotenv()
+
+NIBO_ACCOUNT_ID = getenv("NIBO_ACCOUNT_ID")
+NIBO_CLIENT_SECRET = getenv("NIBO_CLIENT_SECRET")
+
+CATEGORIES_IDS = {
+    "COMPANY_COMISSION": "f7f5fd10-3853-4596-be05-b6db3edcdc78",
+    "SERVICE_CHARGE": "ea8bfefe-7516-41a4-bebe-4028dae0fcb2",
+    "BOOKING_ADVANCE": "08b72268-0921-4a4b-bd86-507bb4bd53da",
+    "CLEANING_FEE": "1d080499-20d1-41d9-b3bd-df7c2880a81f",
+    "ISS": "3f32bf2d-4f45-4b73-9e65-b32b2812d4d2",
+    "BOOKING_COMISSION": "749e8cfe-f95e-4976-95a3-9517b90b048e",
+    "BUY_PRICE": "3d5cc5a9-f5f0-4da5-93cd-d81e7aeaea9a",
+    "ELECTRICITY_FEE": "0d5842fe-89d1-41dc-9b61-69a34f2f1774",
+    "OWNER_FEE": "6d3f0bf1-b637-4d74-9302-e9e0a99a704b"
+}
+
+# CATEGORIES_IDS = {
+#     "COMPANY_COMISSION": "be992852-2894-478e-a470-69107ee882fb",
+#     "SERVICE_CHARGE": "ecf53ff7-b453-4022-9afa-d30157c986f2",
+#     "BOOKING_ADVANCE": "37d86014-71ee-46a4-85fe-0177758d79d1",
+#     "CLEANING_FEE": "aac9d966-7a99-497e-a4cc-179eba164e62",
+#     "ISS": "b33bbc86-880f-494c-92be-b3cfbc5a5101",
+#     "BOOKING_COMISSION": "36501e97-803f-4c35-b473-3816793baec7",
+#     "BUY_PRICE": "e2a3b4ec-33af-4bed-b255-df286e1c72c8",
+#     "ELECTRICITY_FEE": "1b7610c4-5b5c-4c99-9e05-e70a1ca6ec29",
+#     "OWNER_FEE": "ca1a313a-d6bc-4891-900f-2a94c5a850e2"
+# }
+
+SPECIAL_BOOKING_APARTMENTS = [
+    "APTO 209 - BARRA BALI",
+    "APTO 329 - BARRA BALI",
+    "APTO 106 - BARRA BALI",
+    "APTO 213 - BARRA BALI",
+    "APTO 327 - BARRA BALI",
+    "APTO 108 - BARRA BALI",
+    "APTO 106A - BARRA BALI"
+]
