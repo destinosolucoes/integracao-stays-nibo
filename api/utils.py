@@ -1,28 +1,35 @@
 import json
-import time
-
-from datetime import datetime
 
 from api.nibo.constants import NIBO_ACCOUNT_ID
 from api.nibo.index import find_costcenter_id, find_stakeholder_id
-from .constants import STAYS_CLIENT_LOGIN, STAYS_CLIENT_SECRET
+from .constants import STAYS_CLIENT_LOGIN
+from .models import Requests, Logs
 
 def validate_header(headers):
     if "x-stays-client-id" not in headers or "x-stays-signature" not in headers:
         return False
 
     stays_login = headers["x-stays-client-id"]
-    stays_signature = headers["x-stays-signature"]
 
     if stays_login != STAYS_CLIENT_LOGIN:
         return False
 
     return True
 
-def create_log(data):
-    file_name = f"{time.time()}_" + datetime.now().strftime("%Y%m%d%H%M%S")
-    with open(f"api/tests/{file_name}.json", 'w') as file:
-        file.write(json.dumps(data, ensure_ascii=False))
+def create_request_log(dt,action,payload,session):
+    Requests(
+        dt=dt,
+        action=action,
+        payload=json.dumps(payload, ensure_ascii=False)
+    ).create(session=session)
+
+def create_log(dt,action,payload,internal_payload,session):
+    Logs(
+         dt=dt,
+        action=action,
+        payload=json.dumps(payload, ensure_ascii=False),
+        internal_payload=json.dumps(internal_payload, ensure_ascii=False)
+    ).create(session=session)
 
 def create_reservation_dto(reservation_report, reservation):
     cleaning_fee = 0

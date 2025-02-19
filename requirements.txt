@@ -4,3 +4,5 @@ requests
 fake-useragent
 python-dateutil
 python-dotenv
+sqlmodel
+pymysql
