@@ -1,9 +1,34 @@
 import json
 
+from sqlmodel import Field, SQLModel
 from api.nibo.constants import NIBO_ACCOUNT_ID
 from api.nibo.index import find_costcenter_id, find_stakeholder_id
 from .constants import STAYS_CLIENT_LOGIN
-from .models import Requests, Logs
+
+class Requests(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    dt: str = Field(default=None)
+    action: str = Field(default=None)
+    payload: str = Field(default=None)
+
+    def create(self, session):
+        session.add(self)
+        session.commit()
+        session.refresh(self)
+        return self
+    
+class Logs(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    dt: str = Field(default=None)
+    action: str = Field(default=None)
+    payload: str = Field(default=None)
+    internal_payload: str = Field(default=None)
+
+    def create(self, session):
+        session.add(self)
+        session.commit()
+        session.refresh(self)
+        return self
 
 def validate_header(headers):
     if "x-stays-client-id" not in headers or "x-stays-signature" not in headers:
