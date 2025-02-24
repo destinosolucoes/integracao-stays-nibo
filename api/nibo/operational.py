@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from .utils import get_next_month_15, check_special_booking
+from .utils import get_next_month_15
 from .index import find_supplier_id
 from .constants import CATEGORIES_IDS
 

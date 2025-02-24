@@ -2,7 +2,7 @@ from datetime import datetime
 
 from .utils import get_next_month_15
 from .constants import CATEGORIES_IDS
-from .index import find_stakeholder_id
+from .index import find_supplier_id
 
 def get_booking_categories(reservation_dto):
     categories = []
@@ -30,7 +30,7 @@ def get_comission_data(reservation_dto, transaction_dto):
     transaction_dto["categories"] = categories
     transaction_dto["dueDate"] = dueDate
     transaction_dto["scheduleDate"] = scheduleDate
-    transaction_dto["stakeholderId"] = find_stakeholder_id("BOOKING.COM BRASIL SERVICOS DE RESERVA DE HOTEIS LTDA.")
+    transaction_dto["stakeholderId"] = find_supplier_id("BOOKING.COM BRASIL SERVICOS DE RESERVA DE HOTEIS LTDA.")
     transaction_dto["reference"] = f"{reference}_comissao"
 
     return transaction_dto
