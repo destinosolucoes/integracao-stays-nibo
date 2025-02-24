@@ -107,7 +107,7 @@ async def webhook_reservation(request: Request, session: SessionDep):
             print(delete_transactions)
 
     
-    if data["action"] in ["reservation.modified", "reservation.deleted", "reservation.canceled"]:
+    if data["action"] in ["reservation.created", "reservation.modified", "reservation.deleted", "reservation.canceled"]:
         create_log(data["_dt"],data["action"],data["payload"],{"track_log":track_log},session)
 
     return {}
