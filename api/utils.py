@@ -96,6 +96,7 @@ def create_reservation_dto(reservation_report, reservation):
         "company_comission": reservation_report["companyCommision"],
         "buy_price": reservation_report["buyPrice"],
         "reserve_total": reservation_report["reserveTotal"],
+        "total_paid": reservation["stats"]["_f_totalPaid"],
         "service_charge": service_charge,
         "creation_date": reservation_report["creationDate"],
         "iss": reservation_report["iss"] if "iss" in reservation_report else 0,

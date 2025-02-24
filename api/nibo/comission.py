@@ -9,7 +9,7 @@ def get_booking_categories(reservation_dto):
 
     if reservation_dto["owner_fee"] > 0:
         categories.append({
-            "categoryId": CATEGORIES_IDS["BOOKING_ADVANCE"],
+            "categoryId": CATEGORIES_IDS["BOOKING_COMISSION"],
             "value": reservation_dto["owner_fee"]
         })
 

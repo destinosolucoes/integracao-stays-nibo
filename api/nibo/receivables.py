@@ -185,7 +185,7 @@ def get_receivable_data(reservation_dto, transaction_dto):
         categories = get_decolar_categories(reservation_dto)
 
     if reservation_dto["partner_name"] == "API booking.com":
-        if check_special_booking(reservation_dto["partner_name"]):
+        if reservation_dto["total_paid"] == 0:
             dueDate = check_in_date
             scheduleDate = check_in_date
             categories = get_booking_categories(reservation_dto, True)

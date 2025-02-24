@@ -39,14 +39,9 @@ def get_operational_data(reservation_dto, transaction_dto):
         categories = get_regular_categories(reservation_dto)
 
     if reservation_dto["partner_name"] == "API booking.com":
-        if check_special_booking(reservation_dto["partner_name"]):
-            dueDate = get_next_month_15(check_out_date)
-            scheduleDate = get_next_month_15(check_out_date)
-            categories = get_regular_categories(reservation_dto)
-        else:
-            dueDate = get_next_month_15(check_out_date)
-            scheduleDate = get_next_month_15(check_out_date)
-            categories = get_regular_categories(reservation_dto)
+        dueDate = get_next_month_15(check_out_date)
+        scheduleDate = get_next_month_15(check_out_date)
+        categories = get_regular_categories(reservation_dto)
 
     if reservation_dto["partner_name"] == "API expedia":
         dueDate = check_out_date + timedelta(days=32)

@@ -77,7 +77,7 @@ async def webhook_reservation(request: Request, session: SessionDep):
                     print("Erro ao criar operational_transaction")
                     print(operational_transaction)
                 
-                if reservation_dto["partner_name"] == "API booking.com" and reservation["stats"]["_f_totalPaid"] == 0:
+                if reservation_dto["partner_name"] == "API booking.com" and reservation_dto["total_paid"] == 0:
                     comission_transaction = send_transaction(reservation_dto, "comission")
                     track_log.append({"send_transaction_comission":comission_transaction})
 

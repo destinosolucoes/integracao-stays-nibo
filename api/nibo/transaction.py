@@ -76,7 +76,7 @@ def send_transaction(reservation_dto, type: str):
 
     elif type == "comission":
         transaction_dto = get_comission_data(reservation_dto, transaction_dto)
-        return create_credit_schedule(transaction_dto)
+        return create_debit_schedule(transaction_dto)
 
     return create_credit_schedule(transaction_dto)
 
