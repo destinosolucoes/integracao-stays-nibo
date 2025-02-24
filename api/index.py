@@ -45,7 +45,7 @@ async def webhook_reservation(request: Request, session: SessionDep):
     if not validate_header(request.headers):
         raise HTTPException(status_code=403)
 
-    if data["action"] == "reservation.modified":
+    if data["action"] == "reservation.modified" or data["action"] == "reservation.created":
         reservation = data["payload"]
         track_log.append({"get_payload":reservation})
 
