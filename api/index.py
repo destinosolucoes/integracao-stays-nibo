@@ -2,6 +2,7 @@ from typing import Annotated
 from sqlmodel import Session, create_engine
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from datetime import datetime, timedelta
 
 from .stays.index import get_reservation_report
 from .nibo.transaction import send_transaction, update_transaction, delete_transaction, check_transaction_created
@@ -35,6 +36,12 @@ app.add_middleware(
 def health():
     return { "status": "ready" }
 
+def is_checkin_date_older_than_one_month(check_in_date_str):
+    """Check if the check-in date is older than 1 month from now"""
+    check_in_date = datetime.strptime(check_in_date_str, "%Y-%m-%d")
+    one_month_ago = datetime.now() - timedelta(days=30)
+    return check_in_date < one_month_ago
+
 @app.post("/api/stays-webhook")
 async def webhook_reservation(request: Request, session: SessionDep):
     data = await request.json()
@@ -55,6 +62,12 @@ async def webhook_reservation(request: Request, session: SessionDep):
 
             if "partnerName" not in reservation_report:
                 reservation_report["partnerName"] = "website"
+
+            # Ignore reservations with check-in date older than 1 month
+            if is_checkin_date_older_than_one_month(reservation_report["checkInDate"]):
+                track_log.append({"ignored_old_reservation": reservation_report["checkInDate"]})
+                create_log(data["_dt"],data["action"],data["payload"],{"track_log":track_log},session)
+                return {"status": "ignored", "reason": "check-in date older than 1 month"}
 
             reservation_dto = create_reservation_dto(reservation_report, reservation)
             track_log.append({"create_reservation_dto":reservation_dto})
@@ -98,6 +111,12 @@ async def webhook_reservation(request: Request, session: SessionDep):
 
         reservation_report = get_reservation_report(reservation)
         track_log.append({"get_reservation_report":reservation_report})
+
+        # Ignore reservations with check-in date older than 1 month
+        if reservation_report and "checkInDate" in reservation_report and is_checkin_date_older_than_one_month(reservation_report["checkInDate"]):
+            track_log.append({"ignored_old_reservation": reservation_report["checkInDate"]})
+            create_log(data["_dt"],data["action"],data["payload"],{"track_log":track_log},session)
+            return {"status": "ignored", "reason": "check-in date older than 1 month"}
 
         delete_transactions = delete_transaction(reservation["id"])
         track_log.append({"delete_transaction":delete_transactions})
