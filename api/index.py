@@ -52,7 +52,7 @@ async def webhook_reservation(request: Request, session: SessionDep):
     if not validate_header(request.headers):
         raise HTTPException(status_code=403)
 
-    if data["action"] == "reservation.modified" or data["action"] == "reservation.created":
+    if data["action"] == "reservation.modified":
         reservation = data["payload"]
         track_log.append({"get_payload":reservation})
 
@@ -63,7 +63,6 @@ async def webhook_reservation(request: Request, session: SessionDep):
             if "partnerName" not in reservation_report:
                 reservation_report["partnerName"] = "website"
 
-            # Ignore reservations with check-in date older than 1 month
             if is_checkin_date_older_than_one_month(reservation_report["checkInDate"]):
                 track_log.append({"ignored_old_reservation": reservation_report["checkInDate"]})
                 create_log(data["_dt"],data["action"],data["payload"],{"track_log":track_log},session)
@@ -98,8 +97,8 @@ async def webhook_reservation(request: Request, session: SessionDep):
                         print("Erro ao criar comission_transaction")
                         print(comission_transaction)
             else:
-                update_transactions = update_transaction(reservation_report, reservation_dto)
-                track_log.append({"update_transaction":update_transactions})
+                update_transactions, track_log = update_transaction(reservation_report, reservation_dto)
+                track_log.append({"update_transaction":track_log})
                 
                 if update_transactions is False:
                     print("Erro ao criar update_transaction")
@@ -112,7 +111,6 @@ async def webhook_reservation(request: Request, session: SessionDep):
         reservation_report = get_reservation_report(reservation)
         track_log.append({"get_reservation_report":reservation_report})
 
-        # Ignore reservations with check-in date older than 1 month
         if reservation_report and "checkInDate" in reservation_report and is_checkin_date_older_than_one_month(reservation_report["checkInDate"]):
             track_log.append({"ignored_old_reservation": reservation_report["checkInDate"]})
             create_log(data["_dt"],data["action"],data["payload"],{"track_log":track_log},session)
