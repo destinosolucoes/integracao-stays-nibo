@@ -1,4 +1,5 @@
 import requests
+from fastapi import APIRouter, FastAPI
 
 from .constants import STAYS_SECRET
 
@@ -64,3 +65,21 @@ def get_client(client_id: str):
     response = requests.get(url, headers=headers)
 
     return response.json()
+
+# New function to register routes with the main app
+def register_routes(app: FastAPI):
+    router = APIRouter(prefix="/api/stays", tags=["stays"])
+    
+    @router.get("/reservation/{reservation_id}")
+    def reservation_endpoint(reservation_id: str):
+        return get_reservation(reservation_id)
+    
+    @router.get("/listing/{listing_id}")
+    def listing_endpoint(listing_id: str):
+        return get_listing(listing_id)
+    
+    @router.get("/client/{client_id}")
+    def client_endpoint(client_id: str):
+        return get_client(client_id)
+    
+    app.include_router(router)

@@ -1,0 +1,14 @@
+Metadata-Version: 2.1
+Name: destino-bsm
+Version: 0.1.0
+Requires-Dist: fastapi
+Requires-Dist: uvicorn
+Requires-Dist: requests
+Requires-Dist: fake-useragent
+Requires-Dist: python-dateutil
+Requires-Dist: python-dotenv
+Requires-Dist: sqlmodel
+Requires-Dist: pymysql
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-asyncio; extra == "dev"

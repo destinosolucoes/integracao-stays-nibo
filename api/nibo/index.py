@@ -1,4 +1,5 @@
 import requests
+from fastapi import APIRouter, FastAPI, Body
 
 from .utils import sanitize_dates
 from .constants import NIBO_CLIENT_SECRET
@@ -333,10 +334,83 @@ def find_supplier_id(name: str):
     return supplier["id"]
 
 def find_costcenter_id(description):
-    costcenters = get_costcenter(description)
+    costcenter = get_costcenter(description)
+    if costcenter:
+        return costcenter["id"]
+    
+    costcenter = create_costcenter(description)
+    return costcenter["id"]
 
-    if costcenters is False:
-        costcenters_id = create_costcenter(description)
-        costcenters = get_costcenter_by_id(costcenters_id)
-
-    return costcenters["costCenterId"]
+# Register routes with the main FastAPI app
+def register_routes(app: FastAPI):
+    router = APIRouter(prefix="/api/nibo", tags=["nibo"])
+    
+    @router.post("/debit-schedule")
+    def create_debit_schedule_endpoint(payload: dict = Body(...)):
+        return create_debit_schedule(payload)
+    
+    @router.get("/debit-schedule/{reservation_id}")
+    def get_debit_schedule_endpoint(reservation_id: str):
+        return get_debit_schedule(reservation_id)
+    
+    @router.put("/debit-schedule/{schedule_id}")
+    def update_debit_schedule_endpoint(schedule_id: str, payload: dict = Body(...)):
+        return update_debit_schedule(schedule_id, payload)
+    
+    @router.delete("/debit-schedule/{schedule_id}")
+    def delete_debit_schedule_endpoint(schedule_id: str):
+        return delete_debit_schedule(schedule_id)
+    
+    @router.post("/credit-schedule")
+    def create_credit_schedule_endpoint(payload: dict = Body(...)):
+        return create_credit_schedule(payload)
+    
+    @router.get("/credit-schedule/{reservation_id}")
+    def get_credit_schedule_endpoint(reservation_id: str):
+        return get_credit_schedule(reservation_id)
+    
+    @router.put("/credit-schedule/{schedule_id}")
+    def update_credit_schedule_endpoint(schedule_id: str, payload: dict = Body(...)):
+        return update_credit_schedule(schedule_id, payload)
+    
+    @router.delete("/credit-schedule/{schedule_id}")
+    def delete_credit_schedule_endpoint(schedule_id: str):
+        return delete_credit_schedule(schedule_id)
+    
+    @router.get("/stakeholder/{name}")
+    def get_stakeholder_endpoint(name: str):
+        return get_stakeholder(name)
+    
+    @router.get("/stakeholder/id/{stakeholder_id}")
+    def get_stakeholder_by_id_endpoint(stakeholder_id: str):
+        return get_stakeholder_by_id(stakeholder_id)
+    
+    @router.post("/stakeholder")
+    def create_stakeholder_endpoint(name: str):
+        return create_stakeholder(name)
+    
+    @router.get("/supplier/{name}")
+    def get_supplier_endpoint(name: str):
+        return get_supplier(name)
+    
+    @router.get("/supplier/id/{supplier_id}")
+    def get_supplier_by_id_endpoint(supplier_id: str):
+        return get_supplier_by_id(supplier_id)
+    
+    @router.post("/supplier")
+    def create_supplier_endpoint(name: str):
+        return create_supplier(name)
+    
+    @router.get("/costcenter/{description}")
+    def get_costcenter_endpoint(description: str):
+        return get_costcenter(description)
+    
+    @router.get("/costcenter/id/{costcenter_id}")
+    def get_costcenter_by_id_endpoint(costcenter_id: str):
+        return get_costcenter_by_id(costcenter_id)
+    
+    @router.post("/costcenter")
+    def create_costcenter_endpoint(description: str):
+        return create_costcenter(description)
+    
+    app.include_router(router)

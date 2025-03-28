@@ -7,8 +7,16 @@ from contextlib import asynccontextmanager
 
 from .utils import create_request_log, validate_header
 from .constants import DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME
-from .queue import add_to_queue, start_queue_processor, stop_queue_processor
+from .queue import add_to_queue, start_queue_processor, stop_queue_processor, queue_size
 from .webhook_processor import process_webhook_request
+
+# Import all routes from submodules
+from .stays import index as stays_module
+from .nibo import index as nibo_module
+from .nibo import transaction as nibo_transaction
+from .nibo import operational as nibo_operational
+from .nibo import comission as nibo_comission
+from .nibo import receivables as nibo_receivables
 
 db_url = f"mysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 engine = create_engine(db_url)
@@ -57,9 +65,8 @@ def health():
     return { "status": "ready" }
 
 @app.get("/api/queue-status")
-def queue_status():
+def queue_status_endpoint():
     """Get the current status of the webhook processing queue"""
-    from .queue import queue_size
     return {
         "status": "ok",
         "queue_size": queue_size()
@@ -87,3 +94,12 @@ async def webhook_reservation(request: Request, session: SessionDep):
     
     # Return immediately to acknowledge receipt
     return {"status": "queued"}
+
+# Include routes from other modules
+stays_module.register_routes(app)
+nibo_module.register_routes(app)
+
+# Helper function to handle 404s
+@app.get("/{full_path:path}")
+async def catch_all(full_path: str):
+    raise HTTPException(status_code=404, detail=f"Path '/{full_path}' not found")
