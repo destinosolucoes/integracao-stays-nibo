@@ -1,3 +1,0 @@
-"""
-Mock data for tests
-""" 
