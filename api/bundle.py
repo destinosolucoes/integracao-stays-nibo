@@ -3,7 +3,7 @@ This file bundles all the necessary imports and functions into a single file
 to work around Vercel's 12 serverless function limit on the Hobby plan.
 """
 
-# Import necessary libraries
+# Import necessary libraries - use built-in asyncio
 import requests
 import pymysql
 from typing import Annotated, Dict, Any, List, Optional, Callable, AsyncGenerator
@@ -12,6 +12,7 @@ from fastapi import FastAPI, Request, HTTPException, Depends, Body, APIRouter, B
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
+# Import the built-in asyncio
 import asyncio
 import json
 import os
