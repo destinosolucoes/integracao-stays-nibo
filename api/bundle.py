@@ -20,6 +20,9 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Install PyMySQL as MySQLdb
+pymysql.install_as_MySQLdb()
+
 # Constants from .constants
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
@@ -29,6 +32,14 @@ DB_NAME = os.getenv("DB_NAME")
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 NIBO_CLIENT_SECRET = os.getenv("NIBO_CLIENT_SECRET")
 STAYS_SECRET = os.getenv("STAYS_SECRET")
+
+# Import functionality from consolidated modules
+from .stays.all import get_reservation, get_listing, get_client, get_reservation_report
+from .nibo.all import (
+    create_debit_schedule, get_debit_schedule, update_debit_schedule, delete_debit_schedule,
+    create_credit_schedule, get_credit_schedule, get_transaction, get_receivables_by_customer,
+    create_operational_account, create_commission, create_receivable
+)
 
 # Database connection
 db_url = f"mysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
@@ -180,43 +191,6 @@ async def webhook_reservation(request: Request, session: SessionDep):
     # Return immediately to acknowledge receipt
     return {"status": "queued"}
 
-# Helper functions from stays.index
-def get_reservation(reservation_id: str):
-    url = f"https://adsa.stays.com.br/external/v1/booking/reservations/{reservation_id}"
-
-    headers = {
-        "Authorization": f"Basic {STAYS_SECRET}",
-        "accept": "application/json",
-        "content-type": "application/json"
-    }
-
-    response = requests.get(url, headers=headers)
-    return response.json()
-
-def get_listing(listing_id: str):
-    url = f"https://adsa.stays.com.br/external/v1/content/listings/{listing_id}"
-
-    headers = {
-        "Authorization": f"Basic {STAYS_SECRET}",
-        "accept": "application/json",
-        "content-type": "application/json"
-    }
-
-    response = requests.get(url, headers=headers)
-    return response.json()
-
-def get_client(client_id: str):
-    url = f"https://adsa.stays.com.br/external/v1/booking/clients/{client_id}"
-
-    headers = {
-        "Authorization": f"Basic {STAYS_SECRET}",
-        "accept": "application/json",
-        "content-type": "application/json"
-    }
-
-    response = requests.get(url, headers=headers)
-    return response.json()
-
 # Add stays routes
 stays_router = APIRouter(prefix="/api/stays", tags=["stays"])
 
@@ -234,44 +208,6 @@ def client_endpoint(client_id: str):
 
 app.include_router(stays_router)
 
-# Helper functions from nibo
-
-# Add essential Nibo functions - adding just a few as examples
-def create_debit_schedule(payload):
-    url = "https://api.nibo.com.br/empresas/v1/schedules/debit"
-
-    headers = {
-        "accept": "application/json",
-        "content-type": "application/json",
-        "apitoken": NIBO_CLIENT_SECRET
-    }
-
-    response = requests.post(url, json=payload, headers=headers)
-    response = response.json()
-
-    if "error" in response:
-        print("create_debit_schedule error", response["error_description"], payload)
-        return False
-
-    return response
-
-def get_debit_schedule(reservation_id: str):
-    url = f"https://api.nibo.com.br/empresas/v1/schedules/debit?$filter=contains(description,'{reservation_id}')"
-
-    headers = {
-        "accept": "application/json",
-        "content-type": "application/json",
-        "apitoken": NIBO_CLIENT_SECRET
-    }
-
-    response = requests.get(url, headers=headers)
-    response = response.json()
-
-    if "statusCode" in response and response["statusCode"] == 404:
-        return False
-
-    return response["items"]
-
 # Add nibo routes
 nibo_router = APIRouter(prefix="/api/nibo", tags=["nibo"])
 
@@ -282,6 +218,34 @@ def create_debit_schedule_endpoint(payload: dict = Body(...)):
 @nibo_router.get("/debit-schedule/{reservation_id}")
 def get_debit_schedule_endpoint(reservation_id: str):
     return get_debit_schedule(reservation_id)
+
+@nibo_router.put("/debit-schedule/{schedule_id}")
+def update_debit_schedule_endpoint(schedule_id: str, payload: dict = Body(...)):
+    return update_debit_schedule(schedule_id, payload)
+
+@nibo_router.delete("/debit-schedule/{schedule_id}")
+def delete_debit_schedule_endpoint(schedule_id: str):
+    return delete_debit_schedule(schedule_id)
+
+@nibo_router.post("/credit-schedule")
+def create_credit_schedule_endpoint(payload: dict = Body(...)):
+    return create_credit_schedule(payload)
+
+@nibo_router.get("/transaction/{transaction_id}")
+def get_transaction_endpoint(transaction_id: str):
+    return get_transaction(transaction_id)
+
+@nibo_router.post("/operational-account")
+def create_operational_account_endpoint(payload: dict = Body(...)):
+    return create_operational_account(payload)
+
+@nibo_router.post("/commission")
+def create_commission_endpoint(payload: dict = Body(...)):
+    return create_commission(payload)
+
+@nibo_router.post("/receivable")
+def create_receivable_endpoint(payload: dict = Body(...)):
+    return create_receivable(payload)
 
 app.include_router(nibo_router)
 

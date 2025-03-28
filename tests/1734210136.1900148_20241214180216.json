@@ -1,0 +1,93 @@
+{
+    "action": "reservation.modified",
+    "_dt": "2024-12-14T21:02:11.564Z",
+    "payload": {
+        "_id": "6755cb8622b4f070e21b3a26",
+        "id": "QD04I",
+        "creationDate": "2024-12-08",
+        "checkInDate": "2024-12-15",
+        "checkInTime": "14:00",
+        "checkOutDate": "2024-12-17",
+        "checkOutTime": "12:00",
+        "_idlisting": "63d02c887338705d9cb37113",
+        "_idclient": "6755cb8522b4f070e21b3a1f",
+        "type": "booked",
+        "operator": {
+            "_id": "62038926195c9f18b83ef84b",
+            "name": "StaysBot"
+        },
+        "price": {
+            "currency": "BRL",
+            "_f_expected": 977.68,
+            "_f_total": 1267.68,
+            "hostingDetails": {
+                "fees": [
+                    {
+                        "name": "Taxa de limpeza",
+                        "_f_val": 190
+                    },
+                    {
+                        "name": "Taxa de eletricidade",
+                        "_f_val": 100
+                    }
+                ],
+                "discounts": [],
+                "_f_nightPrice": 977.68,
+                "_f_total": 1267.68
+            },
+            "extrasDetails": {
+                "fees": [],
+                "extraServices": [],
+                "discounts": [],
+                "_f_total": 0
+            }
+        },
+        "stats": {
+            "_f_totalPaid": 0
+        },
+        "guests": 4,
+        "guestsDetails": {
+            "adults": 4,
+            "children": 0,
+            "infants": 0,
+            "list": [
+                {
+                    "type": "adult",
+                    "name": "Liziane Vieira da Silva Santos",
+                    "email": "lsanto.382552@guest.booking.com",
+                    "phones": [
+                        {
+                            "iso": "+5579999464479",
+                            "hint": "booking.com"
+                        }
+                    ],
+                    "primary": true
+                },
+                {
+                    "type": "adult",
+                    "name": ""
+                },
+                {
+                    "type": "adult",
+                    "name": ""
+                },
+                {
+                    "type": "adult",
+                    "name": ""
+                }
+            ]
+        },
+        "partner": {
+            "_id": "5d1b5cbec62b271c78796479",
+            "name": "API booking.com",
+            "commission": {
+                "type": "fixed",
+                "_mcval": {
+                    "BRL": 202.83
+                }
+            }
+        },
+        "partnerCode": "4610430217",
+        "reservationUrl": "https://adsa.stays.com.br/i/account-overview/6755cb8522b4f070e21b3a1f?reserve=QD04I"
+    }
+}

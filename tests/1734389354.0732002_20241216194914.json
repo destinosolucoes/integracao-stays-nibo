@@ -1,0 +1,96 @@
+{
+    "action": "reservation.modified",
+    "_dt": "2024-12-16T22:49:06.498Z",
+    "payload": {
+        "_id": "6760ae598a88e32599661150",
+        "id": "QV02I",
+        "creationDate": "2024-12-16",
+        "checkInDate": "2025-01-02",
+        "checkInTime": "14:00",
+        "checkOutDate": "2025-01-12",
+        "checkOutTime": "12:00",
+        "_idlisting": "65b3e13ea7121059e4f31f59",
+        "_idclient": "6760ae598a88e3259966114c",
+        "type": "booked",
+        "operator": {
+            "_id": "62038926195c9f18b83ef84b",
+            "name": "StaysBot"
+        },
+        "price": {
+            "currency": "BRL",
+            "_f_expected": 6673.9,
+            "_f_total": 6913.9,
+            "hostingDetails": {
+                "fees": [
+                    {
+                        "name": "Taxa de Limpeza",
+                        "_f_val": 190
+                    },
+                    {
+                        "name": "Taxa de Eletricidade",
+                        "_f_val": 50
+                    }
+                ],
+                "discounts": [],
+                "_f_nightPrice": 6673.9,
+                "_f_total": 6913.9
+            },
+            "extrasDetails": {
+                "fees": [],
+                "extraServices": [],
+                "discounts": [],
+                "_f_total": 0
+            }
+        },
+        "stats": {
+            "_f_totalPaid": 6913.9
+        },
+        "guests": 5,
+        "guestsDetails": {
+            "adults": 3,
+            "children": 2,
+            "infants": 0,
+            "list": [
+                {
+                    "type": "adult",
+                    "name": "Daniel Peixoto",
+                    "phones": [
+                        {
+                            "iso": "+5582981166012",
+                            "hint": "AirBnB"
+                        }
+                    ],
+                    "primary": true
+                },
+                {
+                    "type": "adult",
+                    "name": "adult_1"
+                },
+                {
+                    "type": "adult",
+                    "name": "adult_2"
+                },
+                {
+                    "type": "child",
+                    "name": "child_1"
+                },
+                {
+                    "type": "child",
+                    "name": "child_2"
+                }
+            ]
+        },
+        "partner": {
+            "_id": "5d1b5c5ec62b271c78796473",
+            "name": "API airbnb",
+            "commission": {
+                "type": "fixed",
+                "_mcval": {
+                    "BRL": 1068.05
+                }
+            }
+        },
+        "partnerCode": "HMJJMYQNB8",
+        "reservationUrl": "https://adsa.stays.com.br/i/account-overview/6760ae598a88e3259966114c?reserve=QV02I"
+    }
+}
