@@ -1,8 +1,9 @@
 # Consolidated Stays module with all functionality
 import requests
+import os
 
-# Constants
-STAYS_SECRET = "YOUR_SECRET_HERE"  # Will be replaced by environment variable in bundle.py
+# Constants - properly use environment variables
+STAYS_SECRET = os.getenv("STAYS_SECRET", "YOUR_SECRET_HERE")
 
 # Core functionality
 def get_reservation(reservation_id: str):

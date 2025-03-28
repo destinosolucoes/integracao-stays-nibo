@@ -1,14 +1,53 @@
 # Consolidated Nibo module with all functionality
 import requests
+import os
+from datetime import datetime
 
-# Constants
-NIBO_CLIENT_SECRET = "YOUR_SECRET_HERE"  # Will be replaced by environment variable in bundle.py
+# Constants - set this to use os.getenv in production
+NIBO_CLIENT_SECRET = os.getenv("NIBO_CLIENT_SECRET", "YOUR_SECRET_HERE")
 
 # Import utilities
 def sanitize_dates(payload):
     """Sanitize dates in the payload to be compatible with Nibo API"""
-    # Implementation would go here
-    return payload
+    if not payload:
+        return payload
+        
+    # Create a copy to avoid modifying the original
+    result = payload.copy()
+    
+    # Process common date fields
+    date_fields = ["dueDate", "transactionDate", "emissionDate", "competencyDate"]
+    
+    for field in date_fields:
+        if field in result and result[field]:
+            # If it's already a valid ISO format string, keep it
+            if isinstance(result[field], str) and "T" in result[field]:
+                continue
+                
+            # Otherwise, ensure it's in the right format for Nibo API
+            try:
+                # Handle various date formats
+                if isinstance(result[field], str):
+                    if "-" in result[field]:
+                        # YYYY-MM-DD format
+                        date_obj = datetime.strptime(result[field], "%Y-%m-%d")
+                    elif "/" in result[field]:
+                        # DD/MM/YYYY format
+                        date_obj = datetime.strptime(result[field], "%d/%m/%Y")
+                    else:
+                        continue
+                elif isinstance(result[field], datetime):
+                    date_obj = result[field]
+                else:
+                    continue
+                    
+                # Convert to ISO format that Nibo expects
+                result[field] = date_obj.isoformat() + "Z"
+            except (ValueError, TypeError):
+                # If there's any error in conversion, keep the original
+                pass
+    
+    return result
 
 # Core functionality from index.py
 def create_debit_schedule(payload):
