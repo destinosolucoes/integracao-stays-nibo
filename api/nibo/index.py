@@ -17,7 +17,6 @@ def create_debit_schedule(payload):
     response = response.json()
 
     if "error" in response:
-        print("create_debit_schedule error", response["error_description"], payload)
         return False
 
     return response
@@ -56,7 +55,6 @@ def update_debit_schedule(schedule_id, payload):
     response = response.json()
 
     if "error" in response:
-        print("update_debit_schedule error", response["error_description"], payload)
         return False
 
     return response
@@ -77,7 +75,6 @@ def delete_debit_schedule(schedule_id):
     response = response.json()
 
     if "error" in response:
-        print("delete_debit_schedule error", response["error_description"])
         return False
 
     return response
@@ -96,7 +93,6 @@ def create_credit_schedule(payload):
     response = response.json()
 
     if "error" in response:
-        print("create_credit_schedule error", response["error_description"], payload)
         return False
 
     return response
@@ -135,7 +131,6 @@ def update_credit_schedule(schedule_id, payload):
     response = response.json()
 
     if "error" in response:
-        print("update_credit_schedule error", response["error_description"], payload)
         return False
 
     return response
@@ -156,7 +151,6 @@ def delete_credit_schedule(schedule_id):
     response = response.json()
 
     if "error" in response:
-        print("delete_credit_schedule error", response["error_description"])
         return False
 
     return response

@@ -58,7 +58,6 @@ def create_log(dt,action,payload,internal_payload,session):
 
 def create_reservation_dto(reservation_report, reservation):
     try:
-        print(f"[DEBUG] Starting create_reservation_dto for reservation ID: {reservation.get('id', 'unknown')}")
         
         # Initialize variables
         cleaning_fee = 0
@@ -69,13 +68,11 @@ def create_reservation_dto(reservation_report, reservation):
         # Get partner name
         try:
             partner_name = reservation_report["partnerName"]
-            print(f"[DEBUG] Partner name: {partner_name}")
         except Exception as e:
             raise Exception(f"Error getting partnerName: {str(e)}")
 
         # Process fees
         try:
-            print(f"[DEBUG] Processing fees: {reservation_report.get('fee', 'NOT_FOUND')}")
             for fee in reservation_report["fee"]:
                 if fee["desc"].lower() == "taxa de limpeza":
                     cleaning_fee = fee["val"]
@@ -83,7 +80,6 @@ def create_reservation_dto(reservation_report, reservation):
                     electricity_fee = fee["val"]
                 elif fee["desc"].lower() == "taxa de serviço":
                     service_charge = fee["val"]
-            print(f"[DEBUG] Fees processed - cleaning: {cleaning_fee}, electricity: {electricity_fee}, service: {service_charge}")
         except Exception as e:
             raise Exception(f"Error processing fees: {str(e)}")
         
@@ -91,20 +87,17 @@ def create_reservation_dto(reservation_report, reservation):
         try:
             if partner_name == "API booking.com" and len(reservation_report["ownerFee"]) > 0:
                 owner_fee = reservation_report["ownerFee"][0]["val"]
-            print(f"[DEBUG] Owner fee: {owner_fee}")
         except Exception as e:
             raise Exception(f"Error processing owner fee: {str(e)}")
 
         # Get listing internal name
         try:
             listing_internal_name = reservation_report["listing"]["internalName"]
-            print(f"[DEBUG] Listing internal name: {listing_internal_name}")
         except Exception as e:
             raise Exception(f"Error getting listing internal name: {str(e)}")
         
         # Get guest name
         try:
-            print(f"[DEBUG] guestsDetails structure: {reservation.get('guestsDetails', 'NOT_FOUND')}")
             guests_details = reservation.get("guestsDetails", {})
             if "list" in guests_details and len(guests_details["list"]) > 0:
                 guest_name = guests_details["list"][0]["name"]
@@ -113,41 +106,34 @@ def create_reservation_dto(reservation_report, reservation):
             elif isinstance(guests_details, list) and len(guests_details) > 0:
                 guest_name = guests_details[0]["name"]
             else:
-                print(f"[WARNING] Unexpected guestsDetails structure: {guests_details}")
                 guest_name = "Unknown Guest"
-            print(f"[DEBUG] Guest name: {guest_name}")
         except Exception as e:
             raise Exception(f"Error getting guest name: {str(e)}")
 
         # Get other required fields step by step
         try:
             reservation_id = reservation_report["id"]
-            print(f"[DEBUG] Reservation ID: {reservation_id}")
         except Exception as e:
             raise Exception(f"Error getting reservation ID: {str(e)}")
 
         try:
             cost_center_id = find_costcenter_id(listing_internal_name)
-            print(f"[DEBUG] Cost center ID: {cost_center_id}")
         except Exception as e:
             raise Exception(f"Error finding cost center ID: {str(e)}")
 
         try:
             stakeholder_id = find_stakeholder_id(guest_name)
-            print(f"[DEBUG] Stakeholder ID: {stakeholder_id}")
         except Exception as e:
             raise Exception(f"Error finding stakeholder ID: {str(e)}")
 
         try:
             owner_name = reservation_report["client"]["name"]
-            print(f"[DEBUG] Owner name: {owner_name}")
         except Exception as e:
             raise Exception(f"Error getting owner name: {str(e)}")
 
         try:
             check_in_date = reservation_report["checkInDate"]
             check_out_date = reservation_report["checkOutDate"]
-            print(f"[DEBUG] Check-in: {check_in_date}, Check-out: {check_out_date}")
         except Exception as e:
             raise Exception(f"Error getting check-in/check-out dates: {str(e)}")
 
@@ -155,25 +141,21 @@ def create_reservation_dto(reservation_report, reservation):
             company_comission = reservation_report["companyCommision"]
             buy_price = reservation_report["buyPrice"]
             reserve_total = reservation_report["reserveTotal"]
-            print(f"[DEBUG] Commission: {company_comission}, Buy price: {buy_price}, Reserve total: {reserve_total}")
         except Exception as e:
             raise Exception(f"Error getting financial data: {str(e)}")
 
         try:
             total_paid = reservation["stats"]["_f_totalPaid"]
-            print(f"[DEBUG] Total paid: {total_paid}")
         except Exception as e:
             raise Exception(f"Error getting total paid from stats: {str(e)}")
 
         try:
             creation_date = reservation_report["creationDate"]
-            print(f"[DEBUG] Creation date: {creation_date}")
         except Exception as e:
             raise Exception(f"Error getting creation date: {str(e)}")
 
         try:
             iss = reservation_report["iss"] if "iss" in reservation_report else 0
-            print(f"[DEBUG] ISS: {iss}")
         except Exception as e:
             raise Exception(f"Error getting ISS: {str(e)}")
 
@@ -201,13 +183,11 @@ def create_reservation_dto(reservation_report, reservation):
                 "iss": iss,
                 "owner_fee": owner_fee,
             }
-            print(f"[DEBUG] DTO created successfully")
             return dto
         except Exception as e:
             raise Exception(f"Error building final DTO: {str(e)}")
             
     except Exception as e:
-        print(f"[ERROR] create_reservation_dto failed: {str(e)}")
         raise e
 
 def calculate_expedia(reservation_dto):

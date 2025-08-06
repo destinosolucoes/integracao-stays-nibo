@@ -105,9 +105,6 @@ def update_transaction(reservation_report, reservation_dto):
         
         transaction = update_debit_schedule(debit_schedule["scheduleId"], debit_schedule)
         track_log.append({"update_debit_schedule":transaction})
-        if transaction is False:
-            print("Erro ao criar update_debit_schedule")
-            print(transaction)
 
     for credit_schedule in credit_schedules:
         credit_schedule["categories"] = change_categories_value(reservation_dto, credit_schedule)
@@ -118,9 +115,6 @@ def update_transaction(reservation_report, reservation_dto):
 
         transaction = update_credit_schedule(credit_schedule["scheduleId"], credit_schedule)
         track_log.append({"update_credit_schedule":transaction})
-        if transaction is False:
-            print("Erro ao criar update_credit_schedule")
-            print(transaction)
 
     return True, track_log
 
@@ -130,14 +124,8 @@ def delete_transaction(reservation_id: str):
 
     for debit_schedule in debit_schedules:
         transaction = delete_debit_schedule(debit_schedule["scheduleId"])
-        if transaction is False:
-            print("Erro ao deletar delete_debit_schedule")
-            print(transaction)
 
     for credit_schedule in credit_schedules:
         transaction = delete_credit_schedule(credit_schedule["scheduleId"])
-        if transaction is False:
-            print("Erro ao deletar delete_credit_schedule")
-            print(transaction)
 
     return True

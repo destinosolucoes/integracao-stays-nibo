@@ -237,20 +237,6 @@ async def create_reservation(request: CreateReservationRequest, session: Session
             "total_errors": len(errors) if errors else 0
         }
         
-        # Log final result (structured)
-        final_log = {
-            "endpoint": "create_reservation",
-            "reservation_id": request.reservation_id,
-            "status": status,
-            "message": message,
-            "error_count": len(errors) if errors else 0,
-            "processing_steps": len(track_log)
-        }
-        print(f"[CREATE_RESERVATION_RESULT] {final_log}")
-        
-        if errors:
-            print(f"[CREATE_RESERVATION_ERRORS] {errors}")
-
         return CreateReservationResponse(
             status=status,
             message=message,
@@ -273,7 +259,6 @@ async def create_reservation(request: CreateReservationRequest, session: Session
             "error": str(e),
             "traceback": error_trace
         }
-        print(f"[CREATE_RESERVATION_SYSTEM_ERROR] {error_log}")
         
         return CreateReservationResponse(
             status="error",
@@ -393,10 +378,6 @@ async def delete_reservation(request: DeleteReservationRequest, session: Session
             "error_count": len(errors) if errors else 0,
             "processing_steps": len(track_log)
         }
-        print(f"[DELETE_RESERVATION_RESULT] {final_log}")
-        
-        if errors:
-            print(f"[DELETE_RESERVATION_ERRORS] {errors}")
 
         return DeleteReservationResponse(
             status=status,
@@ -420,7 +401,6 @@ async def delete_reservation(request: DeleteReservationRequest, session: Session
             "error": str(e),
             "traceback": error_trace
         }
-        print(f"[DELETE_RESERVATION_SYSTEM_ERROR] {error_log}")
         
         return DeleteReservationResponse(
             status="error",
@@ -457,11 +437,6 @@ async def webhook_reservation(request: Request, session: SessionDep):
         errors = []
         
         result = process_reservation_creation(reservation, track_log, errors)
-        
-        # Print errors for webhook debugging (keeping original behavior)
-        for error in errors:
-            print(f"Webhook error: {error}")
-        
     if data["action"] == "reservation.deleted" or data["action"] == "reservation.canceled":
         reservation = data["payload"]
         track_log.append({"get_payload":reservation})
@@ -476,10 +451,6 @@ async def webhook_reservation(request: Request, session: SessionDep):
 
         delete_transactions = delete_transaction(reservation["id"])
         track_log.append({"delete_transaction":delete_transactions})
-
-        if delete_transactions is False:
-            print("Erro ao deletar delete_transaction")
-            print(delete_transactions)
 
     
     if data["action"] in ["reservation.created", "reservation.modified", "reservation.deleted", "reservation.canceled"]:
