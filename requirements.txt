@@ -5,4 +5,4 @@ fake-useragent
 python-dateutil
 python-dotenv
 sqlmodel
-pymysql
+psycopg2-binary
