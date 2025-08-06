@@ -57,51 +57,158 @@ def create_log(dt,action,payload,internal_payload,session):
     ).create(session=session)
 
 def create_reservation_dto(reservation_report, reservation):
-    cleaning_fee = 0
-    service_charge = 0
-    electricity_fee = 0
+    try:
+        print(f"[DEBUG] Starting create_reservation_dto for reservation ID: {reservation.get('id', 'unknown')}")
+        
+        # Initialize variables
+        cleaning_fee = 0
+        service_charge = 0
+        electricity_fee = 0
+        owner_fee = 0
+        
+        # Get partner name
+        try:
+            partner_name = reservation_report["partnerName"]
+            print(f"[DEBUG] Partner name: {partner_name}")
+        except Exception as e:
+            raise Exception(f"Error getting partnerName: {str(e)}")
 
-    owner_fee = 0
-    partner_name = reservation_report["partnerName"]
+        # Process fees
+        try:
+            print(f"[DEBUG] Processing fees: {reservation_report.get('fee', 'NOT_FOUND')}")
+            for fee in reservation_report["fee"]:
+                if fee["desc"].lower() == "taxa de limpeza":
+                    cleaning_fee = fee["val"]
+                elif fee["desc"].lower() == "taxa de eletricidade":
+                    electricity_fee = fee["val"]
+                elif fee["desc"].lower() == "taxa de serviço":
+                    service_charge = fee["val"]
+            print(f"[DEBUG] Fees processed - cleaning: {cleaning_fee}, electricity: {electricity_fee}, service: {service_charge}")
+        except Exception as e:
+            raise Exception(f"Error processing fees: {str(e)}")
+        
+        # Process owner fee for booking.com
+        try:
+            if partner_name == "API booking.com" and len(reservation_report["ownerFee"]) > 0:
+                owner_fee = reservation_report["ownerFee"][0]["val"]
+            print(f"[DEBUG] Owner fee: {owner_fee}")
+        except Exception as e:
+            raise Exception(f"Error processing owner fee: {str(e)}")
 
-    for fee in reservation_report["fee"]:
-        if fee["desc"].lower() == "taxa de limpeza":
-            cleaning_fee = fee["val"]
+        # Get listing internal name
+        try:
+            listing_internal_name = reservation_report["listing"]["internalName"]
+            print(f"[DEBUG] Listing internal name: {listing_internal_name}")
+        except Exception as e:
+            raise Exception(f"Error getting listing internal name: {str(e)}")
+        
+        # Get guest name
+        try:
+            print(f"[DEBUG] guestsDetails structure: {reservation.get('guestsDetails', 'NOT_FOUND')}")
+            guests_details = reservation.get("guestsDetails", {})
+            if "list" in guests_details and len(guests_details["list"]) > 0:
+                guest_name = guests_details["list"][0]["name"]
+            elif "items" in guests_details and len(guests_details["items"]) > 0:
+                guest_name = guests_details["items"][0]["name"]
+            elif isinstance(guests_details, list) and len(guests_details) > 0:
+                guest_name = guests_details[0]["name"]
+            else:
+                print(f"[WARNING] Unexpected guestsDetails structure: {guests_details}")
+                guest_name = "Unknown Guest"
+            print(f"[DEBUG] Guest name: {guest_name}")
+        except Exception as e:
+            raise Exception(f"Error getting guest name: {str(e)}")
 
-        if fee["desc"].lower() == "taxa de eletricidade":
-            electricity_fee = fee["val"]
+        # Get other required fields step by step
+        try:
+            reservation_id = reservation_report["id"]
+            print(f"[DEBUG] Reservation ID: {reservation_id}")
+        except Exception as e:
+            raise Exception(f"Error getting reservation ID: {str(e)}")
 
-        if fee["desc"].lower() == "taxa de serviço":
-            service_charge = fee["val"]
-    
-    if partner_name == "API booking.com" and len(reservation_report["ownerFee"]) > 0:
-        owner_fee = reservation_report["ownerFee"][0]["val"]
+        try:
+            cost_center_id = find_costcenter_id(listing_internal_name)
+            print(f"[DEBUG] Cost center ID: {cost_center_id}")
+        except Exception as e:
+            raise Exception(f"Error finding cost center ID: {str(e)}")
 
-    listing_internal_name = reservation_report["listing"]["internalName"]
-    guest_name = reservation["guestsDetails"]["list"][0]["name"]
+        try:
+            stakeholder_id = find_stakeholder_id(guest_name)
+            print(f"[DEBUG] Stakeholder ID: {stakeholder_id}")
+        except Exception as e:
+            raise Exception(f"Error finding stakeholder ID: {str(e)}")
 
-    return {
-        "account_id": NIBO_ACCOUNT_ID,
-        "reservation_id": reservation_report["id"],
-        "cost_center_id": find_costcenter_id(listing_internal_name),
-        "stakeholder_id": find_stakeholder_id(guest_name),
-        "guest_name": guest_name,
-        "owner_name": reservation_report["client"]["name"],
-        "check_in_date": reservation_report["checkInDate"],
-        "check_out_date": reservation_report["checkOutDate"],
-        "partner_name": partner_name,
-        "listing_internal_name": listing_internal_name,
-        "cleaning_fee": cleaning_fee,
-        "electricity_fee": electricity_fee,
-        "company_comission": reservation_report["companyCommision"],
-        "buy_price": reservation_report["buyPrice"],
-        "reserve_total": reservation_report["reserveTotal"],
-        "total_paid": reservation["stats"]["_f_totalPaid"],
-        "service_charge": service_charge,
-        "creation_date": reservation_report["creationDate"],
-        "iss": reservation_report["iss"] if "iss" in reservation_report else 0,
-        "owner_fee": owner_fee,
-    }
+        try:
+            owner_name = reservation_report["client"]["name"]
+            print(f"[DEBUG] Owner name: {owner_name}")
+        except Exception as e:
+            raise Exception(f"Error getting owner name: {str(e)}")
+
+        try:
+            check_in_date = reservation_report["checkInDate"]
+            check_out_date = reservation_report["checkOutDate"]
+            print(f"[DEBUG] Check-in: {check_in_date}, Check-out: {check_out_date}")
+        except Exception as e:
+            raise Exception(f"Error getting check-in/check-out dates: {str(e)}")
+
+        try:
+            company_comission = reservation_report["companyCommision"]
+            buy_price = reservation_report["buyPrice"]
+            reserve_total = reservation_report["reserveTotal"]
+            print(f"[DEBUG] Commission: {company_comission}, Buy price: {buy_price}, Reserve total: {reserve_total}")
+        except Exception as e:
+            raise Exception(f"Error getting financial data: {str(e)}")
+
+        try:
+            total_paid = reservation["stats"]["_f_totalPaid"]
+            print(f"[DEBUG] Total paid: {total_paid}")
+        except Exception as e:
+            raise Exception(f"Error getting total paid from stats: {str(e)}")
+
+        try:
+            creation_date = reservation_report["creationDate"]
+            print(f"[DEBUG] Creation date: {creation_date}")
+        except Exception as e:
+            raise Exception(f"Error getting creation date: {str(e)}")
+
+        try:
+            iss = reservation_report["iss"] if "iss" in reservation_report else 0
+            print(f"[DEBUG] ISS: {iss}")
+        except Exception as e:
+            raise Exception(f"Error getting ISS: {str(e)}")
+
+        # Build the final DTO
+        try:
+            dto = {
+                "account_id": NIBO_ACCOUNT_ID,
+                "reservation_id": reservation_id,
+                "cost_center_id": cost_center_id,
+                "stakeholder_id": stakeholder_id,
+                "guest_name": guest_name,
+                "owner_name": owner_name,
+                "check_in_date": check_in_date,
+                "check_out_date": check_out_date,
+                "partner_name": partner_name,
+                "listing_internal_name": listing_internal_name,
+                "cleaning_fee": cleaning_fee,
+                "electricity_fee": electricity_fee,
+                "company_comission": company_comission,
+                "buy_price": buy_price,
+                "reserve_total": reserve_total,
+                "total_paid": total_paid,
+                "service_charge": service_charge,
+                "creation_date": creation_date,
+                "iss": iss,
+                "owner_fee": owner_fee,
+            }
+            print(f"[DEBUG] DTO created successfully")
+            return dto
+        except Exception as e:
+            raise Exception(f"Error building final DTO: {str(e)}")
+            
+    except Exception as e:
+        print(f"[ERROR] create_reservation_dto failed: {str(e)}")
+        raise e
 
 def calculate_expedia(reservation_dto):
     if reservation_dto["partner_name"] == "API expedia":

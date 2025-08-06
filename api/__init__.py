@@ -1,2 +1,1 @@
-import pymysql
-pymysql.install_as_MySQLdb()
+# PostgreSQL driver will be loaded automatically by SQLAlchemy
