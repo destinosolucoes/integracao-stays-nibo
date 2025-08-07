@@ -34,10 +34,11 @@ def get_reservation_report(reservation):
     response = requests.post(url, json=payload, headers=headers)
     response = response.json()
 
-    if len(response) == 0:
-        return False
-
-    return response[0]
+    for item in response:
+        if item["_id"] == reservation["_id"]:
+            return item
+    
+    return False
 
 def get_listing(listing_id: str):
     url = f"https://adsa.stays.com.br/external/v1/content/listings/{listing_id}"
