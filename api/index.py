@@ -1,6 +1,6 @@
-from typing import Annotated
+from typing import Annotated, Optional
 from sqlmodel import Session, create_engine
-from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
 from pydantic import BaseModel
@@ -14,13 +14,45 @@ from .constants import DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME
 logger = logging.getLogger(__name__)
 
 db_url = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-engine = create_engine(db_url)
 
-def get_session():
-    with Session(engine) as session:
-        yield session
 
-SessionDep = Annotated[Session, Depends(get_session)]
+def get_db_session() -> Optional[Session]:
+    """Try to get a DB session for logging. Returns None if DB is unavailable."""
+    try:
+        eng = create_engine(db_url, connect_args={"connect_timeout": 5})
+        session = Session(eng)
+        return session
+    except Exception as e:
+        logger.warning(f"DB connection unavailable, skipping logging: {e}")
+        return None
+
+
+def safe_log_request(dt, action, payload, session):
+    """Log request to DB if session is available"""
+    if session:
+        try:
+            create_request_log(dt, action, payload, session)
+        except Exception as e:
+            logger.warning(f"Failed to log request: {e}")
+
+
+def safe_log(dt, action, payload, internal_payload, session):
+    """Log to DB if session is available"""
+    if session:
+        try:
+            create_log(dt, action, payload, internal_payload, session)
+        except Exception as e:
+            logger.warning(f"Failed to create log: {e}")
+
+
+def safe_close_session(session):
+    """Close DB session if it exists"""
+    if session:
+        try:
+            session.close()
+        except Exception:
+            pass
+
 
 app = FastAPI()
 
@@ -179,11 +211,12 @@ def process_reservation_creation(reservation_data, track_log, errors):
         return False
 
 @app.post("/api/create-reservation", response_model=CreateReservationResponse)
-async def create_reservation(request: CreateReservationRequest, session: SessionDep):
+async def create_reservation(request: CreateReservationRequest):
     """
     Create reservation transactions for a specific reservation ID.
     Processes synchronously with maxDuration=60s on Vercel.
     """
+    session = get_db_session()
     try:
         track_log = []
         errors = []
@@ -207,11 +240,11 @@ async def create_reservation(request: CreateReservationRequest, session: Session
             "payload": reservation_data
         }
         
-        create_request_log(log_data["_dt"], log_data["action"], log_data["payload"], session)
+        safe_log_request(log_data["_dt"], log_data["action"], log_data["payload"], session)
         
         result = process_reservation_creation(reservation_data, track_log, errors)
         
-        create_log(log_data["_dt"], log_data["action"], log_data["payload"], {"track_log": track_log}, session)
+        safe_log(log_data["_dt"], log_data["action"], log_data["payload"], {"track_log": track_log}, session)
         
         if not errors and result is True:
             status = "success"
@@ -245,13 +278,16 @@ async def create_reservation(request: CreateReservationRequest, session: Session
             details={"track_log": track_log if 'track_log' in locals() else []},
             errors=[f"System Error: {str(e)}"]
         )
+    finally:
+        safe_close_session(session)
 
 @app.post("/api/delete-reservation", response_model=DeleteReservationResponse)
-async def delete_reservation(request: DeleteReservationRequest, session: SessionDep):
+async def delete_reservation(request: DeleteReservationRequest):
     """
     Delete reservation transactions for a specific reservation ID.
     Processes synchronously with maxDuration=60s on Vercel.
     """
+    session = get_db_session()
     try:
         track_log = []
         errors = []
@@ -278,8 +314,8 @@ async def delete_reservation(request: DeleteReservationRequest, session: Session
         if reservation_report and "checkInDate" in reservation_report:
             if is_checkin_date_older_than_one_month(reservation_report["checkInDate"]):
                 log_data = {"_dt": datetime.now().isoformat(), "action": "reservation.deleted", "payload": reservation_data}
-                create_request_log(log_data["_dt"], log_data["action"], log_data["payload"], session)
-                create_log(log_data["_dt"], log_data["action"], log_data["payload"], {"track_log": track_log}, session)
+                safe_log_request(log_data["_dt"], log_data["action"], log_data["payload"], session)
+                safe_log(log_data["_dt"], log_data["action"], log_data["payload"], {"track_log": track_log}, session)
                 return DeleteReservationResponse(
                     status="ignored",
                     message="Reservation ignored - check-in date is older than 1 month",
@@ -289,7 +325,7 @@ async def delete_reservation(request: DeleteReservationRequest, session: Session
                 )
         
         log_data = {"_dt": datetime.now().isoformat(), "action": "reservation.deleted", "payload": reservation_data}
-        create_request_log(log_data["_dt"], log_data["action"], log_data["payload"], session)
+        safe_log_request(log_data["_dt"], log_data["action"], log_data["payload"], session)
         
         try:
             delete_result = delete_transaction(request.reservation_id)
@@ -300,7 +336,7 @@ async def delete_reservation(request: DeleteReservationRequest, session: Session
             track_log.append({"delete_transaction": f"error: {str(e)}"})
             errors.append(f"Error deleting transactions: {str(e)}")
         
-        create_log(log_data["_dt"], log_data["action"], log_data["payload"], {"track_log": track_log}, session)
+        safe_log(log_data["_dt"], log_data["action"], log_data["payload"], {"track_log": track_log}, session)
         
         status = "success" if not errors else "partial_success"
         message = "Reservation deleted successfully" if not errors else f"Reservation deleted with {len(errors)} errors"
@@ -323,6 +359,8 @@ async def delete_reservation(request: DeleteReservationRequest, session: Session
             details={"track_log": track_log if 'track_log' in locals() else []},
             errors=[f"System Error: {str(e)}"]
         )
+    finally:
+        safe_close_session(session)
 
 
 
@@ -333,42 +371,46 @@ def is_checkin_date_older_than_one_month(check_in_date_str):
     return check_in_date < one_month_ago
 
 @app.post("/api/stays-webhook")
-async def webhook_reservation(request: Request, session: SessionDep):
-    data = await request.json()
+async def webhook_reservation(request: Request):
+    session = get_db_session()
+    try:
+        data = await request.json()
 
-    create_request_log(data["_dt"], data["action"], data["payload"], session)
+        safe_log_request(data["_dt"], data["action"], data["payload"], session)
 
-    if not validate_header(request.headers):
-        raise HTTPException(status_code=403)
+        if not validate_header(request.headers):
+            raise HTTPException(status_code=403)
 
-    track_log = []
+        track_log = []
 
-    if data["action"] in ["reservation.modified", "reservation.created"]:
-        reservation = data["payload"]
-        track_log.append({"get_payload": reservation})
-        errors = []
-        
-        result = process_reservation_creation(reservation, track_log, errors)
+        if data["action"] in ["reservation.modified", "reservation.created"]:
+            reservation = data["payload"]
+            track_log.append({"get_payload": reservation})
+            errors = []
+            
+            result = process_reservation_creation(reservation, track_log, errors)
 
-    elif data["action"] in ["reservation.deleted", "reservation.canceled"]:
-        reservation = data["payload"]
-        track_log.append({"get_payload": reservation})
+        elif data["action"] in ["reservation.deleted", "reservation.canceled"]:
+            reservation = data["payload"]
+            track_log.append({"get_payload": reservation})
 
-        try:
-            reservation_report = get_reservation_report(reservation)
-            track_log.append({"get_reservation_report": reservation_report})
+            try:
+                reservation_report = get_reservation_report(reservation)
+                track_log.append({"get_reservation_report": reservation_report})
 
-            if reservation_report and "checkInDate" in reservation_report and is_checkin_date_older_than_one_month(reservation_report["checkInDate"]):
-                track_log.append({"ignored_old_reservation": reservation_report["checkInDate"]})
-                create_log(data["_dt"], data["action"], data["payload"], {"track_log": track_log}, session)
-                return {}
-        except Exception as e:
-            track_log.append({"get_reservation_report_error": str(e)})
+                if reservation_report and "checkInDate" in reservation_report and is_checkin_date_older_than_one_month(reservation_report["checkInDate"]):
+                    track_log.append({"ignored_old_reservation": reservation_report["checkInDate"]})
+                    safe_log(data["_dt"], data["action"], data["payload"], {"track_log": track_log}, session)
+                    return {}
+            except Exception as e:
+                track_log.append({"get_reservation_report_error": str(e)})
 
-        delete_transactions = delete_transaction(reservation["id"])
-        track_log.append({"delete_transaction": delete_transactions})
+            delete_transactions = delete_transaction(reservation["id"])
+            track_log.append({"delete_transaction": delete_transactions})
 
-    if data["action"] in ["reservation.created", "reservation.modified", "reservation.deleted", "reservation.canceled"]:
-        create_log(data["_dt"], data["action"], data["payload"], {"track_log": track_log}, session)
+        if data["action"] in ["reservation.created", "reservation.modified", "reservation.deleted", "reservation.canceled"]:
+            safe_log(data["_dt"], data["action"], data["payload"], {"track_log": track_log}, session)
 
-    return {}
+        return {}
+    finally:
+        safe_close_session(session)
