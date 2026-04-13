@@ -179,242 +179,114 @@ def process_reservation_creation(reservation_data, track_log, errors):
         return False
 
 @app.post("/api/create-reservation", response_model=CreateReservationResponse)
-async def create_reservation(request: CreateReservationRequest, session: SessionDep):
+async def create_reservation(request: CreateReservationRequest, background_tasks: BackgroundTasks):
     """
     Create reservation transactions for a specific reservation ID.
-    Processes the reservation creation flow similar to webhook reservation.modified.
+    Returns immediately and processes in background to avoid Vercel 10s timeout.
     """
+    background_tasks.add_task(process_create_reservation_async, request.reservation_id, db_url)
+    
+    return CreateReservationResponse(
+        status="processing",
+        message="Reservation sync started, processing in background",
+        reservation_id=request.reservation_id,
+        details=None,
+        errors=None
+    )
+
+
+def process_create_reservation_async(reservation_id: str, db_connection_url: str):
+    """Process reservation creation in background"""
     try:
-        track_log = []
-        errors = []
-        
-        # Get reservation from Stays API
-        try:
-            reservation_data = get_reservation(request.reservation_id)
-            track_log.append({"get_reservation": "success"})
-        except Exception as e:
-            track_log.append({"get_reservation": f"error: {str(e)}"})
-            return CreateReservationResponse(
-                status="error",
-                message="Failed to fetch reservation from Stays API",
-                reservation_id=request.reservation_id,
-                details={"track_log": track_log},
-                errors=[f"API Error: {str(e)}"]
-            )
-        
-        # Create data structure for logging
-        log_data = {
-            "_dt": datetime.now().isoformat(),
-            "action": "reservation.created",
-            "payload": reservation_data
-        }
-        
-        # Log the request
-        create_request_log(log_data["_dt"], log_data["action"], log_data["payload"], session)
-        track_log.append({"create_request_log": "success"})
-        
-        # Process reservation creation
-        result = process_reservation_creation(reservation_data, track_log, errors)
-        
-        # Create final log
-        create_log(log_data["_dt"], log_data["action"], log_data["payload"], {"track_log": track_log}, session)
-        
-        # Determine final status
-        if not errors and result is True:
-            status = "success"
-            message = "Reservation created successfully"
-        elif errors and result is True:
-            status = "partial_success"
-            message = f"Reservation created with {len(errors)} errors"
-        elif isinstance(result, dict) and result.get("status") == "ignored":
-            status = "ignored"
-            message = result.get("reason", "Reservation was ignored")
-        else:
-            status = "error"
-            message = "Failed to create reservation"
-        
-        # Create final response details
-        response_details = {
-            "track_log": track_log,
-            "processed": result,
-            "total_errors": len(errors) if errors else 0
-        }
-        
-        return CreateReservationResponse(
-            status=status,
-            message=message,
-            reservation_id=request.reservation_id,
-            details=response_details,
-            errors=errors if errors else None
-        )
-        
-    except HTTPException:
-        raise
+        engine_bg = create_engine(db_connection_url)
+        with Session(engine_bg) as session:
+            track_log = []
+            errors = []
+            
+            try:
+                reservation_data = get_reservation(reservation_id)
+                track_log.append({"get_reservation": "success"})
+            except Exception as e:
+                track_log.append({"get_reservation": f"error: {str(e)}"})
+                logger.error(f"Failed to fetch reservation {reservation_id}: {e}")
+                return
+            
+            log_data = {
+                "_dt": datetime.now().isoformat(),
+                "action": "reservation.created",
+                "payload": reservation_data
+            }
+            
+            create_request_log(log_data["_dt"], log_data["action"], log_data["payload"], session)
+            
+            result = process_reservation_creation(reservation_data, track_log, errors)
+            
+            create_log(log_data["_dt"], log_data["action"], log_data["payload"], {"track_log": track_log}, session)
+            
+            logger.info(f"Create reservation {reservation_id} completed: errors={len(errors)}")
     except Exception as e:
-        import traceback
-        error_trace = traceback.format_exc()
-        
-        # Log the unexpected error
-        error_log = {
-            "endpoint": "create_reservation",
-            "reservation_id": request.reservation_id,
-            "error_type": "unexpected_system_error",
-            "error": str(e),
-            "traceback": error_trace
-        }
-        
-        return CreateReservationResponse(
-            status="error",
-            message="Unexpected system error occurred",
-            reservation_id=request.reservation_id,
-            details={
-                "track_log": track_log if 'track_log' in locals() else [],
-                "error_trace": error_trace
-            },
-            errors=[f"System Error: {str(e)}"]
-        )
+        logger.error(f"Background create-reservation failed for {reservation_id}: {e}", exc_info=True)
 
 @app.post("/api/delete-reservation", response_model=DeleteReservationResponse)
-async def delete_reservation(request: DeleteReservationRequest, session: SessionDep):
+async def delete_reservation(request: DeleteReservationRequest, background_tasks: BackgroundTasks):
     """
     Delete reservation transactions for a specific reservation ID.
-    Removes all associated debit and credit schedules from Nibo.
+    Returns immediately and processes in background to avoid Vercel 10s timeout.
     """
-    try:
-        track_log = []
-        errors = []
-        
-        # Get reservation from Stays API first to validate it exists and get details
-        try:
-            reservation_data = get_reservation(request.reservation_id)
-            track_log.append({"get_reservation": "success"})
-        except Exception as e:
-            track_log.append({"get_reservation": f"error: {str(e)}"})
-            return DeleteReservationResponse(
-                status="error",
-                message="Failed to fetch reservation from Stays API",
-                reservation_id=request.reservation_id,
-                details={"track_log": track_log},
-                errors=[f"API Error: {str(e)}"]
-            )
-        
-        # Get reservation report to check if it should be processed
-        try:
-            reservation_report = get_reservation_report(reservation_data)
-            track_log.append({"get_reservation_report": "success"})
-        except Exception as e:
-            track_log.append({"get_reservation_report": f"error: {str(e)}"})
-            # Continue with deletion even if we can't get the report
-            reservation_report = None
-            errors.append(f"Could not get reservation report: {str(e)}")
-        
-        # Check if the reservation is too old (same logic as webhook)
-        if reservation_report and "checkInDate" in reservation_report:
-            if is_checkin_date_older_than_one_month(reservation_report["checkInDate"]):
-                track_log.append({"date_check": "ignored_old_reservation", "checkin_date": reservation_report["checkInDate"]})
-                
-                # Create data structure for logging
-                log_data = {
-                    "_dt": datetime.now().isoformat(),
-                    "action": "reservation.deleted",
-                    "payload": reservation_data
-                }
-                
-                # Log the request
-                create_request_log(log_data["_dt"], log_data["action"], log_data["payload"], session)
-                create_log(log_data["_dt"], log_data["action"], log_data["payload"], {"track_log": track_log}, session)
-                
-                return DeleteReservationResponse(
-                    status="ignored",
-                    message="Reservation ignored - check-in date is older than 1 month",
-                    reservation_id=request.reservation_id,
-                    details={"track_log": track_log, "checkin_date": reservation_report["checkInDate"]},
-                    errors=None
-                )
-        
-        # Create data structure for logging
-        log_data = {
-            "_dt": datetime.now().isoformat(),
-            "action": "reservation.deleted",
-            "payload": reservation_data
-        }
-        
-        # Log the request
-        create_request_log(log_data["_dt"], log_data["action"], log_data["payload"], session)
-        track_log.append({"create_request_log": "success"})
-        
-        # Delete transactions using the existing function
-        try:
-            delete_result = delete_transaction(request.reservation_id)
-            track_log.append({"delete_transaction": delete_result})
-            
-            if delete_result is False:
-                errors.append("Failed to delete one or more transactions")
-                
-        except Exception as e:
-            track_log.append({"delete_transaction": f"error: {str(e)}"})
-            errors.append(f"Error deleting transactions: {str(e)}")
-        
-        # Create final log
-        create_log(log_data["_dt"], log_data["action"], log_data["payload"], {"track_log": track_log}, session)
-        
-        # Determine final status
-        if not errors:
-            status = "success"
-            message = "Reservation deleted successfully"
-        else:
-            status = "partial_success"
-            message = f"Reservation deleted with {len(errors)} errors"
-        
-        # Create final response details
-        response_details = {
-            "track_log": track_log,
-            "total_errors": len(errors) if errors else 0
-        }
-        
-        # Log final result (structured)
-        final_log = {
-            "endpoint": "delete_reservation",
-            "reservation_id": request.reservation_id,
-            "status": status,
-            "message": message,
-            "error_count": len(errors) if errors else 0,
-            "processing_steps": len(track_log)
-        }
+    background_tasks.add_task(process_delete_reservation_async, request.reservation_id, db_url)
+    
+    return DeleteReservationResponse(
+        status="processing",
+        message="Reservation deletion started, processing in background",
+        reservation_id=request.reservation_id,
+        details=None,
+        errors=None
+    )
 
-        return DeleteReservationResponse(
-            status=status,
-            message=message,
-            reservation_id=request.reservation_id,
-            details=response_details,
-            errors=errors if errors else None
-        )
-        
-    except HTTPException:
-        raise
+
+def process_delete_reservation_async(reservation_id: str, db_connection_url: str):
+    """Process reservation deletion in background"""
+    try:
+        engine_bg = create_engine(db_connection_url)
+        with Session(engine_bg) as session:
+            track_log = []
+            
+            try:
+                reservation_data = get_reservation(reservation_id)
+                track_log.append({"get_reservation": "success"})
+            except Exception as e:
+                track_log.append({"get_reservation": f"error: {str(e)}"})
+                logger.error(f"Failed to fetch reservation {reservation_id} for deletion: {e}")
+                return
+            
+            try:
+                reservation_report = get_reservation_report(reservation_data)
+                track_log.append({"get_reservation_report": "success"})
+            except Exception as e:
+                track_log.append({"get_reservation_report": f"error: {str(e)}"})
+                reservation_report = None
+            
+            if reservation_report and "checkInDate" in reservation_report:
+                if is_checkin_date_older_than_one_month(reservation_report["checkInDate"]):
+                    track_log.append({"date_check": "ignored_old_reservation"})
+                    log_data = {"_dt": datetime.now().isoformat(), "action": "reservation.deleted", "payload": reservation_data}
+                    create_request_log(log_data["_dt"], log_data["action"], log_data["payload"], session)
+                    create_log(log_data["_dt"], log_data["action"], log_data["payload"], {"track_log": track_log}, session)
+                    return
+            
+            log_data = {"_dt": datetime.now().isoformat(), "action": "reservation.deleted", "payload": reservation_data}
+            create_request_log(log_data["_dt"], log_data["action"], log_data["payload"], session)
+            
+            try:
+                delete_result = delete_transaction(reservation_id)
+                track_log.append({"delete_transaction": delete_result})
+            except Exception as e:
+                track_log.append({"delete_transaction": f"error: {str(e)}"})
+            
+            create_log(log_data["_dt"], log_data["action"], log_data["payload"], {"track_log": track_log}, session)
+            logger.info(f"Delete reservation {reservation_id} completed")
     except Exception as e:
-        import traceback
-        error_trace = traceback.format_exc()
-        
-        # Log the unexpected error
-        error_log = {
-            "endpoint": "delete_reservation",
-            "reservation_id": request.reservation_id,
-            "error_type": "unexpected_system_error",
-            "error": str(e),
-            "traceback": error_trace
-        }
-        
-        return DeleteReservationResponse(
-            status="error",
-            message="Unexpected system error occurred",
-            reservation_id=request.reservation_id,
-            details={
-                "track_log": track_log if 'track_log' in locals() else [],
-                "error_trace": error_trace
-            },
-            errors=[f"System Error: {str(e)}"]
-        )
+        logger.error(f"Background delete-reservation failed for {reservation_id}: {e}", exc_info=True)
 
 
 
@@ -425,16 +297,14 @@ def is_checkin_date_older_than_one_month(check_in_date_str):
     return check_in_date < one_month_ago
 
 @app.post("/api/stays-webhook")
-async def webhook_reservation(request: Request, session: SessionDep, background_tasks: BackgroundTasks):
+async def webhook_reservation(request: Request, background_tasks: BackgroundTasks):
     data = await request.json()
-
-    create_request_log(data["_dt"],data["action"],data["payload"],session)
 
     if not validate_header(request.headers):
         raise HTTPException(status_code=403)
 
     # Return immediately to Stays to avoid ETIMEDOUT
-    # Process the webhook in the background
+    # ALL processing (including DB logging) happens in background
     background_tasks.add_task(process_webhook_async, data, db_url)
 
     return {}
@@ -445,6 +315,9 @@ def process_webhook_async(data: dict, db_connection_url: str):
     try:
         engine_bg = create_engine(db_connection_url)
         with Session(engine_bg) as session:
+            # Log the incoming request first
+            create_request_log(data["_dt"], data["action"], data["payload"], session)
+
             track_log = []
 
             if data["action"] in ["reservation.modified", "reservation.created"]:
