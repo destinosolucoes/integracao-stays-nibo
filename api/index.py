@@ -1,14 +1,17 @@
 from typing import Annotated
 from sqlmodel import Session, create_engine
-from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi import FastAPI, Request, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
 from pydantic import BaseModel
+import logging
 
 from .stays.index import get_reservation_report, get_reservation
 from .nibo.transaction import send_transaction, update_transaction, delete_transaction, check_transaction_created
 from .utils import create_reservation_dto, calculate_expedia, create_request_log, create_log, validate_header
 from .constants import DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME
+
+logger = logging.getLogger(__name__)
 
 db_url = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 engine = create_engine(db_url)
@@ -422,38 +425,55 @@ def is_checkin_date_older_than_one_month(check_in_date_str):
     return check_in_date < one_month_ago
 
 @app.post("/api/stays-webhook")
-async def webhook_reservation(request: Request, session: SessionDep):
+async def webhook_reservation(request: Request, session: SessionDep, background_tasks: BackgroundTasks):
     data = await request.json()
-    track_log = []
 
     create_request_log(data["_dt"],data["action"],data["payload"],session)
 
     if not validate_header(request.headers):
         raise HTTPException(status_code=403)
 
-    if data["action"] == "reservation.modified":
-        reservation = data["payload"]
-        track_log.append({"get_payload":reservation})
-        errors = []
-        
-        result = process_reservation_creation(reservation, track_log, errors)
-    if data["action"] == "reservation.deleted" or data["action"] == "reservation.canceled":
-        reservation = data["payload"]
-        track_log.append({"get_payload":reservation})
-
-        reservation_report = get_reservation_report(reservation)
-        track_log.append({"get_reservation_report":reservation_report})
-
-        if reservation_report and "checkInDate" in reservation_report and is_checkin_date_older_than_one_month(reservation_report["checkInDate"]):
-            track_log.append({"ignored_old_reservation": reservation_report["checkInDate"]})
-            create_log(data["_dt"],data["action"],data["payload"],{"track_log":track_log},session)
-            return {"status": "ignored", "reason": "check-in date older than 1 month"}
-
-        delete_transactions = delete_transaction(reservation["id"])
-        track_log.append({"delete_transaction":delete_transactions})
-
-    
-    if data["action"] in ["reservation.created", "reservation.modified", "reservation.deleted", "reservation.canceled"]:
-        create_log(data["_dt"],data["action"],data["payload"],{"track_log":track_log},session)
+    # Return immediately to Stays to avoid ETIMEDOUT
+    # Process the webhook in the background
+    background_tasks.add_task(process_webhook_async, data, db_url)
 
     return {}
+
+
+def process_webhook_async(data: dict, db_connection_url: str):
+    """Process webhook data in background to avoid Stays timeout"""
+    try:
+        engine_bg = create_engine(db_connection_url)
+        with Session(engine_bg) as session:
+            track_log = []
+
+            if data["action"] in ["reservation.modified", "reservation.created"]:
+                reservation = data["payload"]
+                track_log.append({"get_payload": reservation})
+                errors = []
+                
+                result = process_reservation_creation(reservation, track_log, errors)
+
+            elif data["action"] in ["reservation.deleted", "reservation.canceled"]:
+                reservation = data["payload"]
+                track_log.append({"get_payload": reservation})
+
+                try:
+                    reservation_report = get_reservation_report(reservation)
+                    track_log.append({"get_reservation_report": reservation_report})
+
+                    if reservation_report and "checkInDate" in reservation_report and is_checkin_date_older_than_one_month(reservation_report["checkInDate"]):
+                        track_log.append({"ignored_old_reservation": reservation_report["checkInDate"]})
+                        create_log(data["_dt"], data["action"], data["payload"], {"track_log": track_log}, session)
+                        return
+                except Exception as e:
+                    track_log.append({"get_reservation_report_error": str(e)})
+
+                delete_transactions = delete_transaction(reservation["id"])
+                track_log.append({"delete_transaction": delete_transactions})
+
+            if data["action"] in ["reservation.created", "reservation.modified", "reservation.deleted", "reservation.canceled"]:
+                create_log(data["_dt"], data["action"], data["payload"], {"track_log": track_log}, session)
+
+    except Exception as e:
+        logger.error(f"Background webhook processing failed: {str(e)}", exc_info=True)

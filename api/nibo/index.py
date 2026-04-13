@@ -1,7 +1,37 @@
 import requests
+import time
+import logging
 
 from .utils import sanitize_dates
 from .constants import NIBO_CLIENT_SECRET
+
+logger = logging.getLogger(__name__)
+
+REQUEST_TIMEOUT = 8  # seconds
+MAX_RETRIES = 2
+
+
+def _nibo_request(method, url, headers, json=None, retries=MAX_RETRIES):
+    """Make HTTP request to Nibo API with timeout and retry"""
+    for attempt in range(retries):
+        try:
+            if method == "GET":
+                response = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
+            elif method == "POST":
+                response = requests.post(url, json=json, headers=headers, timeout=REQUEST_TIMEOUT)
+            elif method == "PUT":
+                response = requests.put(url, json=json, headers=headers, timeout=REQUEST_TIMEOUT)
+            elif method == "DELETE":
+                response = requests.delete(url, headers=headers, timeout=REQUEST_TIMEOUT)
+            return response
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+            if attempt < retries - 1:
+                wait = 1 * (attempt + 1)
+                logger.warning(f"Nibo API retry {attempt+1}/{retries} for {url}: {e}")
+                time.sleep(wait)
+            else:
+                logger.error(f"Nibo API failed after {retries} attempts: {url}: {e}")
+                raise
 
 def create_debit_schedule(payload):
     url = "https://api.nibo.com.br/empresas/v1/schedules/debit"
