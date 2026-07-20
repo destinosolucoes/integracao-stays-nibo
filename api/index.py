@@ -7,7 +7,7 @@ from pydantic import BaseModel
 import logging
 
 from .stays.index import get_reservation_report, get_reservation
-from .nibo.transaction import send_transaction, update_transaction, delete_transaction, check_transaction_created
+from .nibo.transaction import send_transaction, update_transaction, delete_transaction, check_transaction_created, deduplicate_reservation_schedules
 from .utils import create_reservation_dto, calculate_expedia, create_request_log, create_log, validate_header
 from .constants import DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME
 
@@ -199,6 +199,15 @@ def process_reservation_creation(reservation_data, track_log, errors):
             except Exception as e:
                 track_log.append({"step": "update_transaction", "error": str(e)})
                 errors.append(f"Error updating transaction: {str(e)}")
+
+        # Self-healing reconciliation: remove any duplicate schedules created by
+        # a concurrent double-delivery of the same Stays event. Never allowed to
+        # break the main flow.
+        try:
+            dedupe_log = deduplicate_reservation_schedules(reservation_dto)
+            track_log.append({"step": "deduplicate_schedules", "removed": len(dedupe_log), "details": dedupe_log})
+        except Exception as e:
+            track_log.append({"step": "deduplicate_schedules", "error": str(e)})
 
         track_log.append({"step": "processing_complete", "success": True})
         return True
