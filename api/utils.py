@@ -56,18 +56,37 @@ def create_log(dt,action,payload,internal_payload,session):
         internal_payload=json.dumps(internal_payload, ensure_ascii=False)
     ).create(session=session)
 
+# Canonical partner names expected by the channel routing (receivables /
+# operational / comission). Stays may return the same partner with different
+# casing (e.g. "API Decolar" vs the expected "API decolar"), which used to make
+# every branch miss and produce an empty schedule that Nibo rejects. Normalizing
+# here fixes it without touching any branch literal.
+_CANONICAL_PARTNERS = {
+    "api airbnb": "API airbnb",
+    "api decolar": "API decolar",
+    "api booking.com": "API booking.com",
+    "api expedia": "API expedia",
+    "website": "website",
+    "diretas": "diretas",
+}
+
+def normalize_partner_name(name):
+    if not isinstance(name, str):
+        return name
+    return _CANONICAL_PARTNERS.get(name.strip().lower(), name)
+
 def create_reservation_dto(reservation_report, reservation):
     try:
-        
+
         # Initialize variables
         cleaning_fee = 0
         service_charge = 0
         electricity_fee = 0
         owner_fee = 0
-        
+
         # Get partner name
         try:
-            partner_name = reservation_report["partnerName"]
+            partner_name = normalize_partner_name(reservation_report["partnerName"])
         except Exception as e:
             raise Exception(f"Error getting partnerName: {str(e)}")
 
