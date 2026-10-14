@@ -1,6 +1,6 @@
 from typing import Annotated, Optional
 from sqlmodel import Session, create_engine
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
 from pydantic import BaseModel
@@ -9,6 +9,7 @@ import logging
 from .stays.index import get_reservation_report, get_reservation
 from .nibo.transaction import send_transaction, update_transaction, delete_transaction, check_transaction_created, deduplicate_reservation_schedules
 from .utils import create_reservation_dto, calculate_expedia, create_request_log, create_log, validate_header
+from .security import require_api_key, check_webhook_signature, cors_origins
 from .constants import DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME
 
 logger = logging.getLogger(__name__)
@@ -56,9 +57,7 @@ def safe_close_session(session):
 
 app = FastAPI()
 
-origins = [
-    "*",
-]
+origins = cors_origins()
 
 app.add_middleware(
     CORSMiddleware,
@@ -219,7 +218,7 @@ def process_reservation_creation(reservation_data, track_log, errors):
         errors.append(f"Error processing reservation creation: {str(e)}")
         return False
 
-@app.post("/api/create-reservation", response_model=CreateReservationResponse)
+@app.post("/api/create-reservation", response_model=CreateReservationResponse, dependencies=[Depends(require_api_key)])
 async def create_reservation(request: CreateReservationRequest):
     """
     Create reservation transactions for a specific reservation ID.
@@ -290,7 +289,7 @@ async def create_reservation(request: CreateReservationRequest):
     finally:
         safe_close_session(session)
 
-@app.post("/api/delete-reservation", response_model=DeleteReservationResponse)
+@app.post("/api/delete-reservation", response_model=DeleteReservationResponse, dependencies=[Depends(require_api_key)])
 async def delete_reservation(request: DeleteReservationRequest):
     """
     Delete reservation transactions for a specific reservation ID.
@@ -383,12 +382,17 @@ def is_checkin_date_older_than_one_month(check_in_date_str):
 async def webhook_reservation(request: Request):
     session = get_db_session()
     try:
+        # Valida a origem ANTES de gravar qualquer coisa no banco.
+        if not validate_header(request.headers):
+            logger.warning("stays-webhook rejeitado: cabecalhos invalidos")
+            raise HTTPException(status_code=403)
+
+        raw_body = await request.body()
+        check_webhook_signature(request.headers, raw_body)
+
         data = await request.json()
 
         safe_log_request(data["_dt"], data["action"], data["payload"], session)
-
-        if not validate_header(request.headers):
-            raise HTTPException(status_code=403)
 
         track_log = []
 
